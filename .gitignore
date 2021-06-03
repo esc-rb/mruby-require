@@ -1,0 +1,5 @@
+/bin
+/build
+/build_config.rb.lock
+/test/lib/*.mrb
+/test/lib/*.so
