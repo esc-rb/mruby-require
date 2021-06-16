@@ -7,6 +7,7 @@
 #include "load_error.h"
 
 #define DIR_SEPARATOR '/'
+#define DIR_SEPARATOR_STR "/"
 
 static void
 join_segment(mrb_state* mrb, mrb_value output_str, const char* segment, size_t segment_length) {
@@ -35,7 +36,26 @@ join_segment(mrb_state* mrb, mrb_value output_str, const char* segment, size_t s
       return;
     }
 
+    for(mrb_int output_index = output_length; output_index >= 0; output_index--) {
+      if(output[output_index] == DIR_SEPARATOR) {
+        size_t new_size = output_index;
+
+        /* Preserve the root directory separator(s) */
+        if(output_index == 0 || (output_index == 1 && output[0] == DIR_SEPARATOR)) {
+          new_size++;
+        }
+
+        mrb_str_resize(mrb, output_str, new_size);
+        return;
+      }
+    }
+
+    mrb_str_resize(mrb, output_str, 0);
+
   } else {
+    if(!root_path && output_length > 0) {
+      mrb_str_cat_lit(mrb, output_str, DIR_SEPARATOR_STR);
+    }
     mrb_str_cat(mrb, output_str, segment, segment_length);
   }
 }
