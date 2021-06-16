@@ -1,0 +1,60 @@
+#include <mruby.h>
+#include <mruby/string.h>
+
+#include <string.h>
+
+#include "expand_path.h"
+#include "load_error.h"
+
+#define DIR_SEPARATOR '/'
+
+static void
+join_segment(mrb_state* mrb, mrb_value output_str, const char* segment, size_t segment_length) {
+  const char* output = RSTRING_CSTR(mrb, output_str);
+  size_t output_length = RSTRING_LEN(output_str);
+
+  mrb_bool root_path = FALSE;
+  if(output_length > 0 && output[0] == DIR_SEPARATOR) {
+    if(output_length == 1) {
+      root_path = TRUE;
+    } else if(output_length == 2) {
+      root_path = output[1] == DIR_SEPARATOR;
+    }
+  }
+
+  if(strncmp(segment, ".", segment_length) == 0) {
+    return;
+
+  } else if(strncmp(segment, "..", segment_length) == 0) {
+    if(root_path == TRUE) {
+      return;
+    }
+
+    if(output_length == 0) {
+      mrb_str_cat(mrb, output_str, segment, segment_length);
+      return;
+    }
+
+  } else {
+    mrb_str_cat(mrb, output_str, segment, segment_length);
+  }
+}
+
+#ifdef CONTROLS
+mrb_value
+mrb_require_controls_expand_path_join_segment(mrb_state* mrb, mrb_value self) {
+  const char* segment;
+  size_t segment_length;
+  mrb_value output_str = mrb_nil_value();
+
+  mrb_get_args(mrb, "s|S", &segment, &segment_length, &output_str);
+
+  if(mrb_nil_p(output_str)) {
+    output_str = mrb_str_new(mrb, NULL, 0);
+  }
+
+  join_segment(mrb, output_str, segment, segment_length);
+
+  return output_str;
+}
+#endif /* CONTROLS */
