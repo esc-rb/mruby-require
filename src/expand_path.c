@@ -300,6 +300,40 @@ mrb_require_expand_relative_path(mrb_state* mrb, mrb_value path_str) {
   return output_str;
 }
 
+mrb_value
+mrb_require_expand_path(mrb_state* mrb, mrb_value path_str, mrb_value origin_str) {
+  const char* path = RSTRING_CSTR(mrb, path_str);
+  size_t path_length = RSTRING_LEN(path_str);
+
+  size_t origin_length;
+
+  if(mrb_nil_p(origin_str)) {
+    origin_length = 0;
+  } else {
+    origin_length = RSTRING_LEN(origin_str);
+  }
+
+  mrb_value output_str = mrb_str_new_capa(mrb, path_length + origin_length);
+
+  mrb_bool relative_path;
+  if(path_length > 0 && (path[0] == DIR_SEPARATOR || path[0] == '~')) {
+    relative_path = FALSE;
+  } else {
+    relative_path = TRUE;
+  }
+
+  if(relative_path == TRUE && origin_length > 0) {
+    const char* origin = RSTRING_CSTR(mrb, origin_str);
+    initial_path(mrb, output_str, origin, origin_length);
+
+    join_path(mrb, output_str, path, path_length);
+  } else {
+    initial_path(mrb, output_str, path, path_length);
+  }
+
+  return output_str;
+}
+
 #ifdef CONTROLS
 mrb_value
 mrb_require_controls_expand_path_join_segment(mrb_state* mrb, mrb_value self) {
@@ -412,5 +446,15 @@ mrb_require_controls_expand_path_relative(mrb_state* mrb, mrb_value self) {
   mrb_get_args(mrb, "S", &path);
 
   return mrb_require_expand_relative_path(mrb, path);
+}
+
+mrb_value
+mrb_require_controls_expand_path(mrb_state* mrb, mrb_value self) {
+  mrb_value path;
+  mrb_value origin = mrb_nil_value();
+
+  mrb_get_args(mrb, "S|S!", &path, &origin);
+
+  return mrb_require_expand_path(mrb, path, origin);
 }
 #endif /* CONTROLS */
