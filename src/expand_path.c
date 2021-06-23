@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "expand_path.h"
 #include "load_error.h"
@@ -151,6 +152,55 @@ join_home_directory(mrb_state* mrb, mrb_value output_str, const char* user, size
   return join_home_directory_raw(mrb, output_str, user, user_length, DEFAULT_ALLOCATION_SIZE_BYTES);
 }
 
+static mrb_int
+join_current_home_directory_raw(mrb_state* mrb, mrb_value output_str, const char* env_var, mrb_int allocation_size_bytes) {
+  if(env_var == NULL) {
+    env_var = "HOME";
+  }
+
+  const char* home_directory = getenv(env_var);
+  if(home_directory != NULL) {
+    size_t home_directory_length = strlen(home_directory);
+    mrb_str_cat(mrb, output_str, home_directory, home_directory_length);
+    return 0;
+  }
+
+  if(allocation_size_bytes == DEFAULT_ALLOCATION_SIZE_BYTES) {
+    allocation_size_bytes = PATH_MAX;
+  }
+
+  mrb_int allocations = 1;
+  char* username = mrb_malloc(mrb, allocation_size_bytes);
+
+  while(getlogin_r(username, allocations * allocation_size_bytes) != 0) {
+    /* An allocation size of zero is used to test handling failures from getlogin_r(3). */
+    if(errno != ERANGE || allocation_size_bytes == 0) {
+      mrb_value message_str = mrb_str_new_lit(mrb, "cannot get home directory");
+
+      mrb_str_cat_lit(mrb, message_str, " (");
+      mrb_str_cat_cstr(mrb, message_str, strerror(errno));
+      mrb_str_cat_lit(mrb, message_str, ")");
+
+      mrb_raise_load_error_message(mrb, message_str);
+    }
+
+    allocations += 1;
+
+    username = mrb_realloc(mrb, username, allocations * allocation_size_bytes);
+  }
+
+  size_t username_length = strnlen(username, allocations * allocation_size_bytes);
+
+  allocations += join_home_directory_raw(mrb, output_str, username, username_length, allocation_size_bytes);
+
+  return allocations;
+}
+
+static inline mrb_int
+join_current_home_directory(mrb_state* mrb, mrb_value output_str) {
+  return join_current_home_directory_raw(mrb, output_str, NULL, DEFAULT_ALLOCATION_SIZE_BYTES);
+}
+
 static void
 initial_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path_length) {
   mrb_int path_index;
@@ -181,6 +231,8 @@ initial_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path
 
     if(path_index > 1) {
       join_home_directory(mrb, output_str, &path[1], path_index - 1);
+    } else {
+      join_current_home_directory(mrb, output_str);
     }
 
     path += path_index;
@@ -251,6 +303,26 @@ mrb_require_controls_expand_path_home_directory(mrb_state* mrb, mrb_value self) 
     allocations = join_home_directory(mrb, output_str, user, user_length);
   } else {
     allocations = join_home_directory_raw(mrb, output_str, user, user_length, allocation_size_bytes);
+  }
+
+  return mrb_fixnum_value(allocations);
+}
+
+mrb_value
+mrb_require_controls_expand_path_current_home_directory(mrb_state* mrb, mrb_value self) {
+  mrb_value output_str;
+  const char* env_var;
+  mrb_bool env_var_given;
+  mrb_int allocation_size_bytes = -1;
+
+  mrb_get_args(mrb, "S|z?i", &output_str, &env_var, &env_var_given, &allocation_size_bytes);
+
+  mrb_int allocations;
+
+  if(env_var_given == FALSE) {
+    allocations = join_current_home_directory(mrb, output_str);
+  } else {
+    allocations = join_current_home_directory_raw(mrb, output_str, env_var, allocation_size_bytes);
   }
 
   return mrb_fixnum_value(allocations);

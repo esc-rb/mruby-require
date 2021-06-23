@@ -59,6 +59,7 @@ mrb_require_controls_init(mrb_state* mrb) {
   mrb_define_class_method(mrb, expand_path_module, "join", mrb_require_controls_expand_path_join_path, MRB_ARGS_REQ(2));
   mrb_define_class_method(mrb, expand_path_module, "initial", mrb_require_controls_expand_path_initial, MRB_ARGS_REQ(1));
   mrb_define_class_method(mrb, expand_path_module, "home_directory", mrb_require_controls_expand_path_home_directory, MRB_ARGS_REQ(2) | MRB_ARGS_OPT(1));
+  mrb_define_class_method(mrb, expand_path_module, "current_home_directory", mrb_require_controls_expand_path_current_home_directory, MRB_ARGS_REQ(1) | MRB_ARGS_OPT(2));
 
   struct RClass* environment_module = mrb_define_module_under(mrb, require_module, "Environment");
   mrb_define_class_method(mrb, environment_module, "home_directory", mrb_require_controls_environment_home_directory, MRB_ARGS_NONE());
