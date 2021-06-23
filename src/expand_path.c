@@ -83,6 +83,28 @@ join_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path_le
   }
 }
 
+static void
+initial_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path_length) {
+  mrb_int path_index;
+
+  for(path_index = 0; path_index < path_length; path_index++) {
+    if(path[path_index] != DIR_SEPARATOR) {
+      break;
+    }
+  }
+
+  /* Path starts with two leading directory separators, e.g. `//' */
+  if(path_index == 2) {
+    mrb_str_cat(mrb, output_str, path, 2);
+
+  /* Path starts with either just one, or else three or more, directory separators, e.g. `/' or `///' */
+  } else if(path_index > 0) {
+    mrb_str_cat(mrb, output_str, path, 1);
+  }
+
+  join_path(mrb, output_str, path, path_length);
+}
+
 #ifdef CONTROLS
 mrb_value
 mrb_require_controls_expand_path_join_segment(mrb_state* mrb, mrb_value self) {
@@ -110,6 +132,20 @@ mrb_require_controls_expand_path_join_path(mrb_state* mrb, mrb_value self) {
   mrb_get_args(mrb, "Ss", &output_str, &path, &path_length);
 
   join_path(mrb, output_str, path, path_length);
+
+  return output_str;
+}
+
+mrb_value
+mrb_require_controls_expand_path_initial(mrb_state* mrb, mrb_value self) {
+  const char* path;
+  size_t path_length;
+
+  mrb_get_args(mrb, "s", &path, &path_length);
+
+  mrb_value output_str = mrb_str_new_capa(mrb, PATH_MAX);
+
+  initial_path(mrb, output_str, path, path_length);
 
   return output_str;
 }

@@ -41,5 +41,6 @@ mrb_require_controls_init(mrb_state* mrb) {
   struct RClass* expand_path_module = mrb_define_module_under(mrb, require_module, "ExpandPath");
   mrb_define_class_method(mrb, expand_path_module, "join_segment", mrb_require_controls_expand_path_join_segment, MRB_ARGS_REQ(1) | MRB_ARGS_OPT(1));
   mrb_define_class_method(mrb, expand_path_module, "join", mrb_require_controls_expand_path_join_path, MRB_ARGS_REQ(2));
+  mrb_define_class_method(mrb, expand_path_module, "initial", mrb_require_controls_expand_path_initial, MRB_ARGS_REQ(1));
 }
 #endif /* CONTROLS */
