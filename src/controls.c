@@ -4,6 +4,7 @@
 
 #include "controls.h"
 #include "file_extension.h"
+#include "expand_path.h"
 #include "load_error.h"
 
 static mrb_value
@@ -36,5 +37,9 @@ mrb_require_controls_init(mrb_state* mrb) {
   mrb_define_class_method(mrb, load_error_module, "raise", mrb_require_controls_load_error_raise, MRB_ARGS_REQ(1));
   mrb_define_class_method(mrb, load_error_module, "raise_reason", mrb_require_controls_load_error_raise_reason, MRB_ARGS_REQ(2));
   mrb_define_class_method(mrb, load_error_module, "raise_message", mrb_require_controls_load_error_raise_message, MRB_ARGS_REQ(1));
+
+  struct RClass* expand_path_module = mrb_define_module_under(mrb, require_module, "ExpandPath");
+  mrb_define_class_method(mrb, expand_path_module, "join_segment", mrb_require_controls_expand_path_join_segment, MRB_ARGS_REQ(1) | MRB_ARGS_OPT(1));
+  mrb_define_class_method(mrb, expand_path_module, "join", mrb_require_controls_expand_path_join_path, MRB_ARGS_REQ(2));
 }
 #endif /* CONTROLS */
