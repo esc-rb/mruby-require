@@ -201,6 +201,48 @@ join_current_home_directory(mrb_state* mrb, mrb_value output_str) {
   return join_current_home_directory_raw(mrb, output_str, NULL, DEFAULT_ALLOCATION_SIZE_BYTES);
 }
 
+static mrb_int
+join_current_directory_raw(mrb_state* mrb, mrb_value output_str, mrb_int allocation_size_bytes) {
+  if(allocation_size_bytes == DEFAULT_ALLOCATION_SIZE_BYTES) {
+    allocation_size_bytes = PATH_MAX;
+  }
+
+  mrb_int allocations = 1;
+
+  /* An allocation size of zero is used to test handling failures from getcwd(3).
+   * mrb_malloc would return a NULL pointer if a zero sized region were requested,
+   * which would cause getcwd(3) to fall back to its own unsafe internal allocation
+   * strategy. Therefore, if allocation size is zero, 1 is supplied to mrb_malloc. */
+  char* home_directory = mrb_malloc(mrb, allocation_size_bytes == 0 ? 1 : allocation_size_bytes);
+
+  while(getcwd(home_directory, allocations * allocation_size_bytes) == NULL) {
+    if(errno != ERANGE) {
+      mrb_value message_str = mrb_str_new_lit(mrb, "cannot get current directory");
+
+      mrb_str_cat_lit(mrb, message_str, " (");
+      mrb_str_cat_cstr(mrb, message_str, strerror(errno));
+      mrb_str_cat_lit(mrb, message_str, ")");
+
+      mrb_raise_load_error_message(mrb, message_str);
+    }
+
+    allocations += 1;
+
+    home_directory = mrb_realloc(mrb, home_directory, allocations * allocation_size_bytes);
+  }
+
+  size_t home_directory_length = strnlen(home_directory, allocations * allocation_size_bytes);
+
+  mrb_str_cat(mrb, output_str, home_directory, home_directory_length);
+
+  return allocations;
+}
+
+static inline mrb_int
+join_current_directory(mrb_state* mrb, mrb_value output_str) {
+  return join_current_directory_raw(mrb, output_str, DEFAULT_ALLOCATION_SIZE_BYTES);
+}
+
 static void
 initial_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path_length) {
   mrb_int path_index;
@@ -237,6 +279,10 @@ initial_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path
 
     path += path_index;
     path_length -= path_index;
+
+  /* Relative path */
+  } else {
+    join_current_directory(mrb, output_str);
   }
 
   join_path(mrb, output_str, path, path_length);
@@ -323,6 +369,25 @@ mrb_require_controls_expand_path_current_home_directory(mrb_state* mrb, mrb_valu
     allocations = join_current_home_directory(mrb, output_str);
   } else {
     allocations = join_current_home_directory_raw(mrb, output_str, env_var, allocation_size_bytes);
+  }
+
+  return mrb_fixnum_value(allocations);
+}
+
+mrb_value
+mrb_require_controls_expand_path_current_directory(mrb_state* mrb, mrb_value self) {
+  mrb_value output_str;
+  mrb_int allocation_size_bytes;
+  mrb_bool allocation_size_bytes_given;
+
+  mrb_get_args(mrb, "S|i?", &output_str, &allocation_size_bytes, &allocation_size_bytes_given);
+
+  mrb_int allocations;
+
+  if(allocation_size_bytes_given == FALSE) {
+    allocations = join_current_directory(mrb, output_str);
+  } else {
+    allocations = join_current_directory_raw(mrb, output_str, allocation_size_bytes);
   }
 
   return mrb_fixnum_value(allocations);
