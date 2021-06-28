@@ -2,6 +2,10 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "controls.h"
 #include "file_extension.h"
 #include "expand_path.h"
@@ -20,6 +24,37 @@ mrb_require_controls_file_extension(mrb_state* mrb, mrb_value self) {
   } else {
     return mrb_str_new_cstr(mrb, path_extension);
   }
+}
+
+static mrb_value
+mrb_require_controls_environment_home_directory(mrb_state* mrb, mrb_value self) {
+  char* home = getenv("HOME");
+
+  return mrb_str_new_cstr_frozen(mrb, (const char*)home);
+}
+
+static mrb_value
+mrb_require_controls_environment_current_user(mrb_state* mrb, mrb_value self) {
+  char* user = getenv("USER");
+
+  return mrb_str_new_cstr_frozen(mrb, (const char*)user);
+}
+
+static mrb_value
+mrb_require_controls_environment_current_directory(mrb_state* mrb, mrb_value self) {
+  char* current_directory = mrb_malloc(mrb, PATH_MAX);
+
+  if(getcwd(current_directory, PATH_MAX) == NULL) {
+    mrb_raisef(mrb, E_RUNTIME_ERROR, "Current directory length exceeds PATH_MAX limit (PATH_MAX: %d)", PATH_MAX);
+  }
+
+  size_t current_directory_length = strnlen(current_directory, PATH_MAX);
+
+  mrb_value current_directory_str = mrb_str_new(mrb, current_directory, current_directory_length);
+
+  mrb_free(mrb, current_directory);
+
+  return current_directory_str;
 }
 
 void
@@ -41,5 +76,14 @@ mrb_require_controls_init(mrb_state* mrb) {
   struct RClass* expand_path_module = mrb_define_module_under(mrb, require_module, "ExpandPath");
   mrb_define_class_method(mrb, expand_path_module, "join_segment", mrb_require_controls_expand_path_join_segment, MRB_ARGS_REQ(1) | MRB_ARGS_OPT(1));
   mrb_define_class_method(mrb, expand_path_module, "join", mrb_require_controls_expand_path_join_path, MRB_ARGS_REQ(2));
+  mrb_define_class_method(mrb, expand_path_module, "initial", mrb_require_controls_expand_path_initial, MRB_ARGS_REQ(1));
+  mrb_define_class_method(mrb, expand_path_module, "home_directory", mrb_require_controls_expand_path_home_directory, MRB_ARGS_REQ(2) | MRB_ARGS_OPT(1));
+  mrb_define_class_method(mrb, expand_path_module, "current_home_directory", mrb_require_controls_expand_path_current_home_directory, MRB_ARGS_REQ(1) | MRB_ARGS_OPT(2));
+  mrb_define_class_method(mrb, expand_path_module, "current_directory", mrb_require_controls_expand_path_current_directory, MRB_ARGS_REQ(1) | MRB_ARGS_OPT(1));
+
+  struct RClass* environment_module = mrb_define_module_under(mrb, require_module, "Environment");
+  mrb_define_class_method(mrb, environment_module, "home_directory", mrb_require_controls_environment_home_directory, MRB_ARGS_NONE());
+  mrb_define_class_method(mrb, environment_module, "current_user", mrb_require_controls_environment_current_user, MRB_ARGS_NONE());
+  mrb_define_class_method(mrb, environment_module, "current_directory", mrb_require_controls_environment_current_directory, MRB_ARGS_NONE());
 }
 #endif /* CONTROLS */
