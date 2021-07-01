@@ -5,6 +5,7 @@
 
 #include "require_relative.h"
 #include "expand_path.h"
+#include "load.h"
 
 static inline mrb_value
 mrb_require_loading_files(mrb_state* mrb) {
@@ -33,9 +34,22 @@ try_require(mrb_state* mrb, mrb_value path) {
     }
   }
 
-  mrb_ary_push(mrb, loaded_features, path);
+  mrb_hash_set(mrb, loading_files, path, mrb_true_value());
 
-  return mrb_true_value();
+  mrb_value return_value = mrb_require_load(mrb, path);
+
+  mrb_hash_delete_key(mrb, loading_files, path);
+
+  if(mrb_obj_is_kind_of(mrb, return_value, mrb->eException_class)) {
+    mrb_exc_raise(mrb, return_value);
+  }
+
+  if(mrb_true_p(return_value)) {
+    mrb_ary_push(mrb, loaded_features, path);
+    return mrb_true_value();
+  } else {
+    return mrb_nil_value();
+  }
 }
 
 mrb_value
