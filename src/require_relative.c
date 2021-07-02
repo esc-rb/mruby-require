@@ -1,10 +1,12 @@
 #include <mruby.h>
 #include <mruby/array.h>
 #include <mruby/hash.h>
+#include <mruby/string.h>
 #include <mruby/variable.h>
 
 #include "require_relative.h"
 #include "expand_path.h"
+#include "file_extension.h"
 #include "load.h"
 
 static inline mrb_value
@@ -21,6 +23,29 @@ static mrb_value
 try_require(mrb_state* mrb, mrb_value path) {
   mrb_value loading_files = mrb_require_loading_files(mrb);
   mrb_value loaded_features = get_loaded_features(mrb);
+
+  const char* extension = get_file_extension(mrb, path);
+  if(extension == NULL) {
+    mrb_value required;
+    size_t original_path_length = RSTRING_LEN(path);
+
+    mrb_str_cat_lit(mrb, path, ".so");
+    required = try_require(mrb, path);
+    if(!mrb_nil_p(required)) {
+      return required;
+    }
+    mrb_str_resize(mrb, path, original_path_length);
+
+    mrb_str_cat_lit(mrb, path, ".mrb");
+    required = try_require(mrb, path);
+    if(!mrb_nil_p(required)) {
+      return required;
+    }
+    mrb_str_resize(mrb, path, original_path_length);
+
+    mrb_str_cat_lit(mrb, path, ".rb");
+    return try_require(mrb, path);
+  }
 
   if(mrb_hash_key_p(mrb, loading_files, path)) {
     return mrb_false_value();
