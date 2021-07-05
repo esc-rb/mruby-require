@@ -2,6 +2,7 @@
 
 #include "dynamic_library.h"
 #include "load_error.h"
+#include "load.h"
 
 #ifdef CONTROLS
 #include "controls.h"
@@ -11,6 +12,7 @@ void
 mrb_mruby_require_gem_init(mrb_state* mrb) {
   mrb_load_error_init(mrb);
   mrb_require_dynamic_library_init(mrb);
+  mrb_require_load_init(mrb);
 
 #ifdef CONTROLS
   mrb_require_controls_init(mrb);
