@@ -36,4 +36,14 @@ task :remove_dynamic_libraries do
   sh 'rm -f test/lib/*.so'
 end
 
-task :clean => :remove_dynamic_libraries
+file 'bin/mrbc' => :all
+
+file 'test/lib/some_feature.mrb' => ['test/lib/some_feature.rb', 'bin/mrbc'] do |task|
+  sh "bin/mrbc -o #{task.name} #{task.prerequisites[0]}"
+end
+task :test => ['test/lib/some_feature.mrb']
+
+task :remove_mrb_files do
+  sh 'rm -f test/lib/*.mrb'
+end
+task :clean => [:remove_dynamic_libraries, :remove_mrb_files]
