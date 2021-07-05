@@ -11,6 +11,7 @@
 #include "dynamic_library.h"
 #include "file_extension.h"
 #include "expand_path.h"
+#include "load.h"
 #include "load_error.h"
 
 static mrb_value
@@ -69,6 +70,7 @@ mrb_require_controls_init(mrb_state* mrb) {
 
   struct RClass* require_module = mrb_define_module_under(mrb, controls_module, "Require");
   mrb_define_class_method(mrb, require_module, "file_extension", mrb_require_controls_file_extension, MRB_ARGS_REQ(1));
+  mrb_define_class_method(mrb, require_module, "load", mrb_require_controls_load, MRB_ARGS_REQ(1));
 
   struct RClass* load_error_module = mrb_define_module_under(mrb, require_module, "LoadError");
   mrb_define_class_method(mrb, load_error_module, "raise", mrb_require_controls_load_error_raise, MRB_ARGS_REQ(1));
