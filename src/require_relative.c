@@ -4,10 +4,13 @@
 #include <mruby/string.h>
 #include <mruby/variable.h>
 
+#include <string.h>
+
 #include "require_relative.h"
 #include "expand_path.h"
 #include "file_extension.h"
 #include "load.h"
+#include "load_error.h"
 
 static inline mrb_value
 mrb_require_loading_files(mrb_state* mrb) {
@@ -84,6 +87,36 @@ mrb_require_relative(mrb_state* mrb, mrb_value relative_path, mrb_value origin) 
   return try_require(mrb, path);
 }
 
+mrb_noreturn static mrb_value
+mrb_kernel_require_relative(mrb_state* mrb, mrb_value self) {
+  mrb_value relative_path;
+
+  mrb_get_args(mrb, "S", &relative_path);
+
+  mrb_raise_load_error_reason(mrb, relative_path, "require_relative cannot be called from a method");
+}
+
+static mrb_value
+mrb_toplevel_require_relative(mrb_state* mrb, mrb_value self) {
+  mrb_value relative_path;
+
+  mrb_get_args(mrb, "S", &relative_path);
+
+  mrb_value directory = mrb_toplevel_dir(mrb);
+  if(mrb_nil_p(directory)) {
+    mrb_raise_load_error_reason(mrb, relative_path, "__dir__ could not be determined");
+  }
+
+  mrb_value path = mrb_require_expand_path(mrb, relative_path, directory);
+
+  mrb_value required = try_require(mrb, path);
+  if(mrb_nil_p(required)) {
+    mrb_raise_load_error(mrb, path);
+  }
+
+  return required;
+}
+
 void
 mrb_require_relative_init(mrb_state* mrb) {
   mrb_value loading_files = mrb_hash_new(mrb);
@@ -92,6 +125,9 @@ mrb_require_relative_init(mrb_state* mrb) {
   mrb_value loaded_features = mrb_ary_new(mrb);
   mrb_gv_set(mrb, mrb_intern_lit(mrb, "$\""), loaded_features);
   mrb_gv_set(mrb, mrb_intern_lit(mrb, "$LOADED_FEATURES"), loaded_features);
+
+  mrb_define_method(mrb, mrb->kernel_module, "require_relative", mrb_kernel_require_relative, MRB_ARGS_REQ(1));
+  mrb_define_singleton_method(mrb, mrb->top_self, "require_relative", mrb_toplevel_require_relative, MRB_ARGS_REQ(1));
 }
 
 #ifdef CONTROLS
