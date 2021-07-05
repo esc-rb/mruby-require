@@ -10,6 +10,7 @@
 #include "dynamic_library.h"
 #include "expand_path.h"
 #include "file_extension.h"
+#include "load_error.h"
 
 static inline mrb_value
 expand_directory(mrb_state* mrb, mrb_value path) {
@@ -97,9 +98,36 @@ mrb_toplevel___dir__(mrb_state* mrb, mrb_value self) {
   return mrb_toplevel_dir(mrb);
 }
 
+mrb_bool
+mrb_load(mrb_state* mrb, mrb_value path) {
+  mrb_value return_value = mrb_require_load(mrb, path);
+
+  if(mrb_obj_is_kind_of(mrb, return_value, mrb->eException_class)) {
+    mrb_exc_raise(mrb, return_value);
+  }
+
+  return mrb_bool(return_value);
+}
+
+static mrb_value
+mrb_kernel_load(mrb_state* mrb, mrb_value self) {
+  mrb_value path;
+
+  mrb_get_args(mrb, "S", &path);
+
+  mrb_bool loaded = mrb_load(mrb, path);
+
+  if(loaded) {
+    return mrb_true_value();
+  } else {
+    mrb_raise_load_error(mrb, path);
+  }
+}
+
 void
 mrb_require_load_init(mrb_state* mrb) {
   mrb_define_singleton_method(mrb, mrb->top_self, "__dir__", mrb_toplevel___dir__, MRB_ARGS_NONE());
+  mrb_define_method(mrb, mrb->kernel_module, "load", mrb_kernel_load, MRB_ARGS_REQ(1));
 }
 
 #ifdef CONTROLS
