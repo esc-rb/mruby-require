@@ -1,5 +1,6 @@
 #ifdef CONTROLS
 #include <mruby.h>
+#include <mruby/class.h>
 #include <mruby/string.h>
 
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include <unistd.h>
 
 #include "controls.h"
+#include "dynamic_library.h"
 #include "file_extension.h"
 #include "expand_path.h"
 #include "load_error.h"
@@ -87,5 +89,13 @@ mrb_require_controls_init(mrb_state* mrb) {
   mrb_define_class_method(mrb, environment_module, "home_directory", mrb_require_controls_environment_home_directory, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, environment_module, "current_user", mrb_require_controls_environment_current_user, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, environment_module, "current_directory", mrb_require_controls_environment_current_directory, MRB_ARGS_NONE());
+
+  struct RClass* dynamic_library_class = mrb_define_class_under(mrb, require_module, "DynamicLibrary", mrb->object_class);
+  MRB_SET_INSTANCE_TT(dynamic_library_class, MRB_TT_DATA);
+  mrb_define_method(mrb, dynamic_library_class, "initialize", mrb_require_controls_dynamic_library_initialize, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, dynamic_library_class, "path", mrb_require_controls_dynamic_library_path, MRB_ARGS_NONE());
+  mrb_define_method(mrb, dynamic_library_class, "init_function_name", mrb_require_controls_dynamic_library_init_function_name, MRB_ARGS_NONE());
+  mrb_define_method(mrb, dynamic_library_class, "final_function_name", mrb_require_controls_dynamic_library_final_function_name, MRB_ARGS_NONE());
+  mrb_define_method(mrb, dynamic_library_class, "inspect", mrb_require_controls_dynamic_library_inspect, MRB_ARGS_NONE());
 }
 #endif /* CONTROLS */
