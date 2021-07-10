@@ -1,16 +1,32 @@
 #include <mruby.h>
 #include <mruby/data.h>
+#include <mruby/error.h>
 #include <mruby/numeric.h>
 #include <mruby/string.h>
 
+#include <dlfcn.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "dynamic_library.h"
 #include "file_extension.h"
+#include "load_error.h"
 
 #define gem_function_prefix "GENERATED_TMP_mrb_"
 #define gem_init_function_suffix "_gem_init"
 #define gem_final_function_suffix "_gem_final"
+
+typedef void (*mrbgem_init_function_ptr)(mrb_state*);
+typedef void (*mrbgem_final_function_ptr)(mrb_state*);
+
+static inline mrb_bool
+loaded_p(DynamicLibrary dynamic_library) {
+  if(dynamic_library->resource == NULL) {
+    return FALSE;
+  } else {
+    return TRUE;
+  }
+}
 
 static void
 mrb_dynamic_library_free(mrb_state* mrb, void* ptr) {
@@ -98,6 +114,81 @@ gem_final_function_name(mrb_state* mrb, DynamicLibrary dynamic_library) {
   return str;
 }
 
+static mrb_value
+call_gem_init_function(mrb_state* mrb, void* gem_init_function_ptr) {
+  mrbgem_init_function_ptr gem_init_function = (mrbgem_init_function_ptr) gem_init_function_ptr;
+  gem_init_function(mrb);
+  return mrb_nil_value();
+}
+
+static mrb_bool
+load_dynamic_library(mrb_state* mrb, DynamicLibrary_mut dynamic_library) {
+  const char* path = RSTRING_CSTR(mrb, dynamic_library->path);
+
+  struct stat stat_buf;
+  if(stat(path, &stat_buf) < 0) {
+    return FALSE;
+  }
+
+  void* resource = dlopen(path, RTLD_LAZY | RTLD_GLOBAL);
+  if(resource == NULL) {
+    mrb_raise_load_error_reason(mrb, dynamic_library->path, dlerror());
+  }
+  dlerror();
+
+  const char* init_function_name = RSTRING_CSTR(mrb, gem_init_function_name(mrb, dynamic_library));
+  mrbgem_init_function_ptr gem_init_function = (mrbgem_init_function_ptr)dlsym(resource, init_function_name);
+
+  if(gem_init_function == NULL) {
+    dlclose(resource);
+
+    mrb_value reason_str = mrb_str_new_lit(mrb, "missing gem init function: ");
+    mrb_str_cat_cstr(mrb, reason_str, init_function_name);
+
+    mrb_raise_load_error_reason(mrb, dynamic_library->path, RSTRING_CSTR(mrb, reason_str));
+  }
+  dlerror();
+
+  mrb_bool error;
+  mrb_value exception = mrb_protect_error(mrb, call_gem_init_function, gem_init_function, &error);
+
+  if(error) {
+    dlclose(resource);
+    mrb_exc_raise(mrb, exception);
+  }
+
+  dynamic_library->resource = resource;
+
+  return TRUE;
+}
+
+static mrb_value
+call_gem_final_function(mrb_state* mrb, void* gem_final_function_ptr) {
+  mrbgem_final_function_ptr gem_final_function = (mrbgem_final_function_ptr) gem_final_function_ptr;
+  gem_final_function(mrb);
+  return mrb_nil_value();
+}
+
+void
+unload_dynamic_library(mrb_state* mrb, DynamicLibrary_mut dynamic_library) {
+  const char* final_function_name = RSTRING_CSTR(mrb, gem_final_function_name(mrb, dynamic_library));
+  mrbgem_final_function_ptr gem_final_function = (mrbgem_final_function_ptr)dlsym(dynamic_library->resource, final_function_name);
+
+  mrb_assert(gem_final_function != NULL);
+
+  void* resource = dynamic_library->resource;
+  dynamic_library->resource = NULL;
+
+  mrb_bool error = FALSE;
+  mrb_value exception = mrb_protect_error(mrb, call_gem_final_function, gem_final_function, &error);
+
+  dlclose(resource);
+
+  if(error) {
+    mrb_exc_raise(mrb, exception);
+  }
+}
+
 #ifdef CONTROLS
 mrb_value
 mrb_require_controls_dynamic_library_initialize(mrb_state* mrb, mrb_value self) {
@@ -150,5 +241,32 @@ mrb_require_controls_dynamic_library_inspect(mrb_state* mrb, mrb_value self) {
   mrb_str_cat_lit(mrb, inspect_text, "\">");
 
   return inspect_text;
+}
+
+mrb_value
+mrb_require_controls_dynamic_library_load(mrb_state* mrb, mrb_value self) {
+  DynamicLibrary_mut dynamic_library = dynamic_library_get_mut_ptr(mrb, self);
+
+  mrb_bool loaded = load_dynamic_library(mrb, dynamic_library);
+
+  return mrb_bool_value(loaded);
+}
+
+mrb_value
+mrb_require_controls_dynamic_library_unload(mrb_state* mrb, mrb_value self) {
+  DynamicLibrary_mut dynamic_library = dynamic_library_get_mut_ptr(mrb, self);
+
+  unload_dynamic_library(mrb, dynamic_library);
+
+  return mrb_true_value();
+}
+
+mrb_value
+mrb_require_controls_dynamic_library_loaded_p(mrb_state* mrb, mrb_value self) {
+  DynamicLibrary dynamic_library = dynamic_library_get_ptr(mrb, self);
+
+  mrb_bool loaded = loaded_p(dynamic_library);
+
+  return mrb_bool_value(loaded);
 }
 #endif /* CONTROLS */
