@@ -1,8 +1,10 @@
 #include <mruby.h>
 #include <mruby/data.h>
 #include <mruby/error.h>
+#include <mruby/hash.h>
 #include <mruby/numeric.h>
 #include <mruby/string.h>
+#include <mruby/variable.h>
 
 #include <dlfcn.h>
 #include <string.h>
@@ -90,6 +92,11 @@ dynamic_library_get_ptr(mrb_state* mrb, mrb_value dynamic_library_obj) {
   return dynamic_library_get_mut_ptr(mrb, dynamic_library_obj);
 }
 
+static inline mrb_value
+mrb_require_loaded_dynamic_libraries(mrb_state* mrb) {
+  return mrb_gv_get(mrb, mrb_intern_lit(mrb, "REQUIRE_LOADED_DYNAMIC_LIBRARIES"));
+}
+
 static mrb_value
 gem_init_function_name(mrb_state* mrb, DynamicLibrary dynamic_library) {
   size_t capacity = sizeof(gem_function_prefix) + dynamic_library->name_segment_length + sizeof(gem_init_function_suffix);
@@ -162,6 +169,30 @@ load_dynamic_library(mrb_state* mrb, DynamicLibrary_mut dynamic_library) {
   return TRUE;
 }
 
+mrb_bool
+mrb_load_dynamic_library(mrb_state* mrb, mrb_value path) {
+  mrb_value loaded_dynamic_libraries = mrb_require_loaded_dynamic_libraries(mrb);
+
+  if(mrb_hash_key_p(mrb, loaded_dynamic_libraries, path)) {
+    mrb_raise_load_error_reason(mrb, path, "already loaded");
+  }
+
+  DynamicLibrary_mut dynamic_library = allocate_dynamic_library(mrb, path);
+
+  if(load_dynamic_library(mrb, dynamic_library)) {
+    struct RData* rdata_ptr = mrb_data_object_alloc(mrb, NULL, dynamic_library, &mrb_dynamic_library_type);
+    mrb_value dynamic_library_object = mrb_obj_value(rdata_ptr);
+
+    mrb_hash_set(mrb, loaded_dynamic_libraries, path, dynamic_library_object);
+
+    return TRUE;
+  } else {
+    mrb_free(mrb, dynamic_library);
+
+    return FALSE;
+  }
+}
+
 static mrb_value
 call_gem_final_function(mrb_state* mrb, void* gem_final_function_ptr) {
   mrbgem_final_function_ptr gem_final_function = (mrbgem_final_function_ptr) gem_final_function_ptr;
@@ -189,7 +220,15 @@ unload_dynamic_library(mrb_state* mrb, DynamicLibrary_mut dynamic_library) {
   }
 }
 
+void
+mrb_require_dynamic_library_init(mrb_state* mrb) {
+  mrb_value loaded_dynamic_libraries = mrb_hash_new(mrb);
+  mrb_gv_set(mrb, mrb_intern_lit(mrb, "REQUIRE_LOADED_DYNAMIC_LIBRARIES"), loaded_dynamic_libraries);
+}
+
 #ifdef CONTROLS
+#include <mruby/class.h>
+
 mrb_value
 mrb_require_controls_dynamic_library_initialize(mrb_state* mrb, mrb_value self) {
   mrb_value path;
@@ -268,5 +307,30 @@ mrb_require_controls_dynamic_library_loaded_p(mrb_state* mrb, mrb_value self) {
   mrb_bool loaded = loaded_p(dynamic_library);
 
   return mrb_bool_value(loaded);
+}
+
+mrb_value
+mrb_require_controls_dynamic_library_loaded_libraries(mrb_state* mrb, mrb_value self) {
+  return mrb_require_loaded_dynamic_libraries(mrb);
+}
+
+mrb_value
+mrb_require_controls_dynamic_library_class_load(mrb_state* mrb, mrb_value self) {
+  mrb_value path_str;
+  mrb_get_args(mrb, "S", &path_str);
+
+  mrb_bool loaded = mrb_load_dynamic_library(mrb, path_str);
+
+  if(loaded) {
+    mrb_value loaded_dynamic_libraries = mrb_require_loaded_dynamic_libraries(mrb);
+    mrb_value dynamic_library_obj = mrb_hash_get(mrb, loaded_dynamic_libraries, path_str);
+
+    struct RBasic* rbasic_ptr = mrb_basic_ptr(dynamic_library_obj);
+    rbasic_ptr->c = mrb_class_ptr(self);
+
+    return dynamic_library_obj;
+  } else {
+    return mrb_nil_value();
+  }
 }
 #endif /* CONTROLS */
