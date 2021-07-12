@@ -19,4 +19,5 @@ mrb_mruby_require_gem_init(mrb_state* mrb) {
 
 void
 mrb_mruby_require_gem_final(mrb_state* mrb) {
+  mrb_require_dynamic_library_final(mrb);
 }

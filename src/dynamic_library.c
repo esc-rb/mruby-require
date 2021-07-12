@@ -226,6 +226,27 @@ mrb_require_dynamic_library_init(mrb_state* mrb) {
   mrb_gv_set(mrb, mrb_intern_lit(mrb, "REQUIRE_LOADED_DYNAMIC_LIBRARIES"), loaded_dynamic_libraries);
 }
 
+static int
+mrb_require_dynamic_library_unload_each(mrb_state* mrb, mrb_value path_str, mrb_value dynamic_library_obj, void* data) {
+  struct RHash* hash_ptr = data;
+
+  DynamicLibrary_mut dynamic_library = dynamic_library_get_mut_ptr(mrb, dynamic_library_obj);
+  unload_dynamic_library(mrb, dynamic_library);
+
+  mrb_hash_delete_key(mrb, mrb_obj_value(hash_ptr), path_str);
+
+  return 0;
+}
+
+void
+mrb_require_dynamic_library_final(mrb_state* mrb) {
+  mrb_value loaded_dynamic_libraries = mrb_require_loaded_dynamic_libraries(mrb);
+
+  struct RHash* hash_ptr = RHASH(loaded_dynamic_libraries);
+
+  mrb_hash_foreach(mrb, hash_ptr, mrb_require_dynamic_library_unload_each, hash_ptr);
+}
+
 #ifdef CONTROLS
 #include <mruby/class.h>
 
@@ -332,5 +353,12 @@ mrb_require_controls_dynamic_library_class_load(mrb_state* mrb, mrb_value self) 
   } else {
     return mrb_nil_value();
   }
+}
+
+mrb_value
+mrb_require_controls_dynamic_library_class_unload_all(mrb_state* mrb, mrb_value self) {
+  mrb_require_dynamic_library_final(mrb);
+
+  return mrb_true_value();
 }
 #endif /* CONTROLS */

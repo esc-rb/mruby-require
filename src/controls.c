@@ -102,5 +102,6 @@ mrb_require_controls_init(mrb_state* mrb) {
   mrb_define_method(mrb, dynamic_library_class, "loaded?", mrb_require_controls_dynamic_library_loaded_p, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, dynamic_library_class, "loaded_libraries", mrb_require_controls_dynamic_library_loaded_libraries, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, dynamic_library_class, "load", mrb_require_controls_dynamic_library_class_load, MRB_ARGS_REQ(1));
+  mrb_define_class_method(mrb, dynamic_library_class, "unload_all", mrb_require_controls_dynamic_library_class_unload_all, MRB_ARGS_NONE());
 }
 #endif /* CONTROLS */
