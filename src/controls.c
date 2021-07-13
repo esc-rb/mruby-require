@@ -1,8 +1,25 @@
 #ifdef CONTROLS
 #include <mruby.h>
+#include <mruby/string.h>
 
 #include "controls.h"
+#include "file_extension.h"
 #include "load_error.h"
+
+static mrb_value
+mrb_require_controls_file_extension(mrb_state* mrb, mrb_value self) {
+  mrb_value path;
+
+  mrb_get_args(mrb, "S", &path);
+
+  const char* path_extension = get_file_extension(mrb, path);
+
+  if(path_extension == NULL) {
+    return mrb_nil_value();
+  } else {
+    return mrb_str_new_cstr(mrb, path_extension);
+  }
+}
 
 void
 mrb_require_controls_init(mrb_state* mrb) {
@@ -13,6 +30,7 @@ mrb_require_controls_init(mrb_state* mrb) {
   struct RClass* controls_module = mrb_module_get(mrb, "Controls");
 
   struct RClass* require_module = mrb_define_module_under(mrb, controls_module, "Require");
+  mrb_define_class_method(mrb, require_module, "file_extension", mrb_require_controls_file_extension, MRB_ARGS_REQ(1));
 
   struct RClass* load_error_module = mrb_define_module_under(mrb, require_module, "LoadError");
   mrb_define_class_method(mrb, load_error_module, "raise", mrb_require_controls_load_error_raise, MRB_ARGS_REQ(1));
