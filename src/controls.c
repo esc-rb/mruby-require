@@ -13,6 +13,7 @@
 #include "expand_path.h"
 #include "load.h"
 #include "load_error.h"
+#include "require.h"
 #include "require_relative.h"
 
 static mrb_value
@@ -74,6 +75,7 @@ mrb_require_controls_init(mrb_state* mrb) {
   mrb_define_class_method(mrb, require_module, "load", mrb_require_controls_load, MRB_ARGS_REQ(1));
   mrb_define_class_method(mrb, require_module, "loading_files", mrb_require_controls_loading_files, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, require_module, "require_relative", mrb_require_controls_require_relative, MRB_ARGS_REQ(2));
+  mrb_define_class_method(mrb, require_module, "parse_load_paths", mrb_require_controls_parse_load_paths, MRB_ARGS_REQ(1));
 
   struct RClass* load_error_module = mrb_define_module_under(mrb, require_module, "LoadError");
   mrb_define_class_method(mrb, load_error_module, "raise", mrb_require_controls_load_error_raise, MRB_ARGS_REQ(1));
