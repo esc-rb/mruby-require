@@ -1,5 +1,6 @@
 #include <mruby.h>
 
+mrb_bool mrb_require(mrb_state*, mrb_value feature);
 void mrb_require_init(mrb_state*);
 
 #ifdef CONTROLS
