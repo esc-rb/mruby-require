@@ -288,6 +288,18 @@ initial_path(mrb_state* mrb, mrb_value output_str, const char* path, size_t path
   join_path(mrb, output_str, path, path_length);
 }
 
+mrb_value
+mrb_require_expand_relative_path(mrb_state* mrb, mrb_value path_str) {
+  const char* path = RSTRING_CSTR(mrb, path_str);
+  size_t path_length = RSTRING_LEN(path_str);
+
+  mrb_value output_str = mrb_str_new_capa(mrb, path_length);
+
+  join_path(mrb, output_str, path, path_length);
+
+  return output_str;
+}
+
 #ifdef CONTROLS
 mrb_value
 mrb_require_controls_expand_path_join_segment(mrb_state* mrb, mrb_value self) {
@@ -391,5 +403,14 @@ mrb_require_controls_expand_path_current_directory(mrb_state* mrb, mrb_value sel
   }
 
   return mrb_fixnum_value(allocations);
+}
+
+mrb_value
+mrb_require_controls_expand_path_relative(mrb_state* mrb, mrb_value self) {
+  mrb_value path;
+
+  mrb_get_args(mrb, "S", &path);
+
+  return mrb_require_expand_relative_path(mrb, path);
 }
 #endif /* CONTROLS */
