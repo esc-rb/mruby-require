@@ -3,7 +3,7 @@ MRuby::Gem::Specification.new('mruby-require') do |spec|
   spec.authors = ["Nathan Ladd"]
 
   spec.summary = "Implements require (incl. $: and $\"), require_relative, and load"
-  spec.homepage = "https://github.com/esc-rb/mruby-require"
+  spec.homepage = "https://github.com/evt-rb/mruby-require"
 
   spec.linker.libraries << 'dl'
 
